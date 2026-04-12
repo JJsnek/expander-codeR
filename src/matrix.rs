@@ -25,23 +25,29 @@ impl SparseMatrix{
 }
 
 //Brakedown-style
-pub fn from_graph_random (g:&Graph) ->SparseMatrix{
-    let rows=g.adj.iter().map(|neighbors|{
-        neighbors.iter().map(|&j|{
-            (j,rand_field())
-            }).collect()
-        }).collect();
-    SparseMatrix{rows}
+
+
+pub fn from_graph_random(g: &Graph) -> SparseMatrix {
+    let mut rows = vec![Vec::new(); g.right_size];
+
+    for (i, neighbors) in g.adj.iter().enumerate() {
+        for &j in neighbors {
+            rows[j].push((i, rand_field()));
+        }
+    }
+
+    SparseMatrix { rows }
 }
 
 //Spielman-style
+pub fn from_graph_nonzero(g: &Graph) -> SparseMatrix {
+    let mut rows = vec![Vec::new(); g.right_size];
 
-pub fn from_graph_nonzero(g:&Graph) -> SparseMatrix{
-    let rows=g.adj.iter().map(|neighbors|{
-        neighbors.iter().map(|&j|{
-            (j,rand_nonzero())
-        }).collect()
-    }).collect();
+    for (i, neighbors) in g.adj.iter().enumerate() {
+        for &j in neighbors {
+            rows[j].push((i, rand_nonzero()));
+        }
+    }
 
-    SparseMatrix {rows}
+    SparseMatrix { rows }
 }

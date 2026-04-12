@@ -2,17 +2,47 @@ use expander_codeR::field::F;
 use expander_codeR::expander::{build_layer,SamplingMode};
 use expander_codeR::encoder::encode_recursive;
 
+use expander_codeR::experiment::*;
+use rand::distributions::uniform::SampleBorrow;
+
 fn main(){
-    let n=1024;
-    let m=512;
-    let d=3;
-    let layer=build_layer(n,m,d,SamplingMode::Random);
+    
+    //experiments
+    let mut results=Vec::new();
 
-    let layers=vec![layer];
+    let ns=vec![1024,];
+    let ds = vec![3,5,7,9,11];
+    let weights =vec![1,2,4,8,16];
+    let modes=vec![
+        SamplingMode::Random,
+        SamplingMode::NonZero,
+        SamplingMode::Hybrid,
+    ];
 
-    let x:Vec<F>=(0..n).map(|_| F::from(1u64)).collect();
+    for &mode in &modes{
+        for &n in &ns{
+            for &d in &ds{
+                for &w in &weights{
+                    let cfg=ExperimentConfig{
+                        n,
+                        m:n/2,
+                        d,
+                        layers:2,
+                        trials:1000,
+                        weight:2,
+                        mode,
+                    };
 
-    let y=encode_recursive(x,&layers);
+                    println!(
+                        "mode={:?}, n={}, d={}, weight={}",
+                        mode, n, d, w
+                    );
 
-    println!("Output length: {}",y.len());
+                    let result=run_experiment(&cfg);
+                    results.push(result);
+                }
+            }
+        }
+    }
+    write_csv(&results,"results.csv");
 }
