@@ -1,0 +1,9 @@
+[package]
+name = "expander-codeR"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ark-ff="0.4"
+ark-bn254="0.4"
+rand="0.8"
