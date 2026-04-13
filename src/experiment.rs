@@ -1,6 +1,6 @@
 use crate::field::{F,rand_field};
 use ark_ff::Zero;
-use crate::encoder::{encode_recursive,Layer};
+use crate::encoder::{encode,Layer};
 use crate::expander::{build_layer,SamplingMode};
 
 
@@ -18,31 +18,25 @@ pub struct ExperimentConfig {
 }
 
 //recursion
-
 pub fn build_layers(cfg: &ExperimentConfig) -> Vec<Layer> {
     let mut layers = Vec::new();
 
-    let mut n = cfg.n;
-    let mut m = cfg.m;
+    let mut current_n = cfg.n;
 
     for i in 0..cfg.layers {
+        let projected_n = current_n / 2;
+
         let mode = match cfg.mode {
             SamplingMode::Random => SamplingMode::Random,
             SamplingMode::NonZero => SamplingMode::NonZero,
-            SamplingMode::Hybrid => {
-                if i < cfg.layers / 2 {
-                    SamplingMode::NonZero
-                } else {
-                    SamplingMode::Random
-                }
-            }
+            SamplingMode::Hybrid => SamplingMode::Hybrid,
         };
 
-        let layer = build_layer(n, m, cfg.d, mode);
+        let layer = build_layer(projected_n, cfg.m, cfg.d, mode);
         layers.push(layer);
 
-        n = m;
-        m /= 2;
+        // after A→B, output becomes size m
+        current_n = cfg.m;
     }
 
     layers
@@ -100,7 +94,7 @@ pub fn run_experiment(cfg: &ExperimentConfig)->ExperimentResult{
         let x=random_sparse_vector(cfg.n,cfg.weight);
 
         let start=Instant::now();
-        let y= encode_recursive(x,&layers);
+        let y= encode(x,&layers);
         let elapsed=start.elapsed().as_secs_f64();
 
         total_time+=elapsed;

@@ -14,17 +14,31 @@ pub fn apply_matrix(x: &[F], m: &SparseMatrix) -> Vec<F> {
 
 
 
-pub fn encode_recursive(x: Vec<F>, layers: &[Layer]) -> Vec<F> {
+use rand::seq::SliceRandom;
+use rand::thread_rng;
+
+pub fn project(x: &[F]) -> Vec<F> {
+    x.iter().step_by(2).cloned().collect()
+}
+
+
+pub fn encode(x: Vec<F>, layers: &[Layer]) -> Vec<F> {
     if layers.is_empty() {
         return x;
     }
 
     let first = &layers[0];
 
-    // Apply A then B FIRST
-    let y = first.A.apply(&x);
-    let z = first.B.apply(&y);
+    // 1. projection
+    let x_proj = project(&x);
 
-    // Then recurse
-    encode_recursive(z, &layers[1..])
+    // 2. recursive encoding
+    let inner = encode(x_proj, &layers[1..]);
+
+    // 3. expander (τ_k)
+    let y = first.A.apply(&inner);
+    let parity = first.B.apply(&y);
+
+    // 4. concatenate (systematic)
+    [x, parity].concat()
 }

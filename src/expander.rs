@@ -13,26 +13,34 @@ pub enum SamplingMode{
 
 
 //1 layer
-pub fn build_layer(
-    n:usize,
-    m:usize,
-    d:usize,
-    mode:SamplingMode,
-)->Layer {
-    let g1=sample_d_regular(n, m, d);
-    let g2=sample_d_regular(m, n, d);
 
-    let A= match mode{
-        SamplingMode::Random=>from_graph_random(&g1),
-        SamplingMode::NonZero=>from_graph_random(&g1),
-        SamplingMode::Hybrid => unreachable!(), // handled above
-    };
-    let B=match mode{
-        SamplingMode::Random=>from_graph_random(&g2),
-        SamplingMode::NonZero=>from_graph_nonzero(&g2),
-        SamplingMode::Hybrid => unreachable!(), // handled above
-    };
-
-    Layer {A,B}
-}
    
+pub fn build_layer(
+    n: usize,
+    m: usize,
+    d: usize,
+    mode: SamplingMode,
+) -> Layer {
+    let g1 = sample_d_regular(n, m, d);
+    let g2 = sample_d_regular(m, n, d);
+
+    match mode {
+        SamplingMode::Random => {
+            let A = from_graph_random(&g1);
+            let B = from_graph_random(&g2);
+            Layer { A, B }
+        }
+
+        SamplingMode::NonZero => {
+            let A = from_graph_nonzero(&g1);
+            let B = from_graph_nonzero(&g2);
+            Layer { A, B }
+        }
+
+        SamplingMode::Hybrid => {
+            let A = from_graph_nonzero(&g1);  // structured
+            let B = from_graph_random(&g2);   // random
+            Layer { A, B }
+        }
+    }
+}
