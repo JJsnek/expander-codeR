@@ -12,6 +12,8 @@ pub fn apply_matrix(x: &[F], m: &SparseMatrix) -> Vec<F> {
     m.apply(x)
 }
 
+
+
 pub fn encode_recursive(x: Vec<F>, layers: &[Layer]) -> Vec<F> {
     if layers.is_empty() {
         return x;
@@ -19,12 +21,10 @@ pub fn encode_recursive(x: Vec<F>, layers: &[Layer]) -> Vec<F> {
 
     let first = &layers[0];
 
-    // x -> A
+    // Apply A then B FIRST
     let y = first.A.apply(&x);
+    let z = first.B.apply(&y);
 
-    // recursive
-    let z = encode_recursive(y, &layers[1..]);
-
-    // -> B
-    first.B.apply(&z)
+    // Then recurse
+    encode_recursive(z, &layers[1..])
 }
