@@ -16,6 +16,13 @@ impl SparseMatrix{
             let mut acc=F::zero();
 
             for(col,val) in row{
+                //
+                assert!(
+                *col < x.len(),
+                "Matrix access out of bounds: col {} >= {}",
+                col,
+                x.len());
+
                 acc+=*val *x[*col];
             }
             result[i]=acc;

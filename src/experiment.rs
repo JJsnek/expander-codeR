@@ -1,6 +1,6 @@
 use crate::field::{F,rand_field};
 use ark_ff::Zero;
-use crate::encoder::{encode,Layer};
+use crate::encoder::{encode, encode_with_trace, Layer, EncodingTrace};
 use crate::expander::{build_layer,SamplingMode};
 
 
@@ -20,23 +20,24 @@ pub struct ExperimentConfig {
 //recursion
 pub fn build_layers(cfg: &ExperimentConfig) -> Vec<Layer> {
     let mut layers = Vec::new();
-
     let mut current_n = cfg.n;
 
-    for i in 0..cfg.layers {
+    for _ in 0..cfg.layers {
+        assert!(current_n % 2 == 0, "n must be divisible by 2 at every layer");
+
         let projected_n = current_n / 2;
 
-        let mode = match cfg.mode {
-            SamplingMode::Random => SamplingMode::Random,
-            SamplingMode::NonZero => SamplingMode::NonZero,
-            SamplingMode::Hybrid => SamplingMode::Hybrid,
-        };
+        let layer = build_layer(
+            projected_n,  // input size (after projection)
+            projected_n,  // output size (keep square for stability)
+            cfg.d,
+            cfg.mode,
+        );
 
-        let layer = build_layer(projected_n, cfg.m, cfg.d, mode);
         layers.push(layer);
 
-        // after A→B, output becomes size m
-        current_n = cfg.m;
+        // shrink for next layer
+        current_n = projected_n;
     }
 
     layers
@@ -50,7 +51,7 @@ pub fn random_vector(n:usize)->Vec<F>{
     (0..n).map(|_| F::rand(&mut rng)).collect()
 }
 
-//sprarse vector generator
+//sparse vector generator
 pub fn random_sparse_vector(n:usize,weight:usize) ->Vec<F>{
     let mut v=vec![F::zero(); n];
 
@@ -62,13 +63,70 @@ pub fn random_sparse_vector(n:usize,weight:usize) ->Vec<F>{
     }
     v
 }
+//corrupt for testing
+pub fn corrupt(v: &mut [F], num_errors: usize) {
+    use rand::seq::SliceRandom;
 
+    let mut rng = rand::thread_rng();
+    let mut indices: Vec<_> = (0..v.len()).collect();
+    indices.shuffle(&mut rng);
+
+    for &i in indices.iter().take(num_errors) {
+        v[i] = rand_field();
+    }
+}
 
 //zero check helper
 pub fn is_zero_vector(v:&[F])->bool{
     v.iter().all(|x| x.is_zero())
 }
 
+
+
+
+
+
+
+//constraints
+pub fn local_test(
+    trace: &EncodingTrace,
+    layers: &[Layer],
+    num_checks: usize,
+) -> bool {
+    use rand::Rng;
+    let mut rng = rand::thread_rng();
+
+    for (layer_idx, layer) in layers.iter().enumerate() {
+        let current = &trace.layers[layer_idx + 1];
+        let next = &trace.layers[layer_idx];
+
+        let x_len = next.len() / 2;
+        let parity = &next[x_len..];
+
+        for _ in 0..num_checks {
+            let row = rng.gen_range(0..layer.B.rows.len());
+
+            let mut acc = F::zero();
+
+            for (col, val) in &layer.B.rows[row] {
+                let mut inner_acc = F::zero();
+
+                for (inner_col, inner_val) in &layer.A.rows[*col] {
+                  
+                    inner_acc += *inner_val * current[*inner_col];
+                }
+
+                acc += *val * inner_acc;
+            }
+
+            if acc != parity[row] {
+                return false;
+            }
+        }
+    }
+
+    true
+}
 
 //core experiment
 use std::time::Instant;
@@ -86,7 +144,7 @@ pub struct ExperimentResult {
 
 pub fn run_experiment(cfg: &ExperimentConfig)->ExperimentResult{
     let layers=build_layers(cfg);
-    let mut printed = false;
+
 
     let mut failures=0;
     let mut total_time=0.0;
@@ -95,15 +153,21 @@ pub fn run_experiment(cfg: &ExperimentConfig)->ExperimentResult{
         let x=random_sparse_vector(cfg.n,cfg.weight);
         //if !printed {println!("\n=== SAMPLE INPUT ===");println!("Input length: {}", x.len());}
         let start=Instant::now();
-        let y= encode(x,&layers);
+        let trace = encode_with_trace(x, &layers);
         let elapsed=start.elapsed().as_secs_f64();
 
         total_time+=elapsed;
+        
+        let mut corrupted = trace.layers.last().unwrap().clone();
+        corrupt(&mut corrupted, cfg.weight);
 
         //if !printed {println!("\n=== ENCODED OUTPUT ===");println!("Output length: {}", y.len());printed = true;}
         
-        if is_zero_vector(&y){
-            failures +=1;
+        // simulate verifier detection
+        let detected = !local_test(&trace, &layers, 5);
+
+        if !detected {
+            failures += 1;
         }
     }
 
@@ -119,6 +183,11 @@ pub fn run_experiment(cfg: &ExperimentConfig)->ExperimentResult{
         avg_time_ms: (total_time/cfg.trials as f64)*1000.0
      }
 }
+
+
+
+
+
 
 
 //csv
