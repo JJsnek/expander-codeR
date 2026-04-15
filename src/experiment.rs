@@ -9,7 +9,8 @@ use rand::thread_rng;
 
 pub struct ExperimentConfig {
     pub n: usize,
-    pub m: usize,
+    pub alpha_num: usize,
+    pub alpha_den: usize,
     pub d: usize,
     pub layers: usize,
     pub trials: usize,

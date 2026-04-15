@@ -2,6 +2,11 @@
 use expander_codeR::expander::SamplingMode;
 use expander_codeR::experiment::*;
 
+fn alpha_to_ratio(alpha: f64) -> (usize, usize) {
+    let den = 1000;
+    let num = (alpha * den as f64) as usize;
+    (num.max(1), den)
+}
 fn main() {
     let mut results = Vec::new();
 
@@ -28,10 +33,13 @@ fn main() {
 for &(alpha, rho, delta) in &params {
     let (weight, d) = guess_cd(alpha, rho, delta);
 
+    let (alpha_num, alpha_den) = alpha_to_ratio(alpha);
+
     for &mode in &modes {
         let cfg = ExperimentConfig {
             n,
-            m: n / 2,
+            alpha_num,
+            alpha_den,
             d,
             layers: 2,
             trials: 200,
@@ -72,7 +80,8 @@ for &n in &ns {
     for &mode in &modes {
         let cfg = ExperimentConfig {
             n,
-            m: n / 2,
+            alpha_num: 1,
+            alpha_den: 3, // fixed alpha scaling test
             d,
             layers: 2,
             trials: 100,
