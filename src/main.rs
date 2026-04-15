@@ -8,13 +8,7 @@ fn main() {
     let n = 2048;
 
     // Table 1-style configs: (c_n ≈ weight, d_n ≈ d)
-    let configs = vec![
-        (4, 7),
-        (4, 9),
-        (6, 9),
-        (6, 11),
-        (8, 11),
-    ];
+    
 
     let modes = vec![
         SamplingMode::Random,   // brakedown
@@ -22,27 +16,38 @@ fn main() {
         SamplingMode::Hybrid,
     ];
 
-    for &(weight, d) in &configs {
-        for &mode in &modes {
-            let cfg = ExperimentConfig {
-                n,
-                m: n / 2,        // will be adapted by recursion
-                d,
-                layers: 2,       // try 3 later if stable
-                trials: 200,     // reduce noise but keep runtime reasonable
-                weight,          // ✅ FIXED (you had weight:2 before!)
-                mode,
-            };
+    let params = vec![
+    (0.120, 0.704, 0.02),
+    (0.138, 0.680, 0.03),
+    (0.178, 0.657, 0.04),
+    (0.200, 0.610, 0.05),
+    (0.211, 0.619, 0.06),
+    (0.238, 0.581, 0.07),
+];
 
-            println!(
-                "mode={:?}, (c,d)=({},{}), n={}",
-                mode, weight, d, n
-            );
+for &(alpha, rho, delta) in &params {
+    let (weight, d) = guess_cd(alpha, rho, delta);
 
-            let result = run_experiment(&cfg);
-            results.push(result);
-        }
+    for &mode in &modes {
+        let cfg = ExperimentConfig {
+            n,
+            m: n / 2,
+            d,
+            layers: 2,
+            trials: 200,
+            weight,
+            mode,
+        };
+
+        println!(
+            "α={:.3}, ρ={:.3}, δ={:.3} → (c,d)=({}, {}) mode={:?}",
+            alpha, rho, delta, weight, d, mode
+        );
+
+        let result = run_experiment(&cfg);
+        results.push(result);
     }
+}
 
     write_csv(&results, "results.csv");
 

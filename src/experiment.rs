@@ -86,19 +86,22 @@ pub struct ExperimentResult {
 
 pub fn run_experiment(cfg: &ExperimentConfig)->ExperimentResult{
     let layers=build_layers(cfg);
+    let mut printed = false;
 
     let mut failures=0;
     let mut total_time=0.0;
 
     for _ in 0..cfg.trials{
         let x=random_sparse_vector(cfg.n,cfg.weight);
-
+        //if !printed {println!("\n=== SAMPLE INPUT ===");println!("Input length: {}", x.len());}
         let start=Instant::now();
         let y= encode(x,&layers);
         let elapsed=start.elapsed().as_secs_f64();
 
         total_time+=elapsed;
 
+        //if !printed {println!("\n=== ENCODED OUTPUT ===");println!("Output length: {}", y.len());printed = true;}
+        
         if is_zero_vector(&y){
             failures +=1;
         }
@@ -153,4 +156,18 @@ pub fn write_csv(results:&[ExperimentResult], filename: &str){
             r.avg_time_ms
         ).unwrap();
     }
+}
+
+pub fn guess_cd(alpha: f64, rho: f64, delta: f64) -> (usize, usize) {
+    // base scaling from delta (main driver)
+    let base_c = (4.0 + delta * 80.0) as usize;   // grows with δ
+    let base_d = (18.0 - delta * 80.0) as usize;  // shrinks with δ
+
+    // adjust with α/ρ ratio (outer cost weight)
+    let k = alpha / rho;
+
+    let d = ((base_d as f64) * k).round().max(6.0) as usize;
+    let c = ((base_c as f64) * (1.0 / k)).round().max(2.0) as usize;
+
+    (c, d)
 }
