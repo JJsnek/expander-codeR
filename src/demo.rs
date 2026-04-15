@@ -12,6 +12,17 @@ use crate::experiment::{
 };
 use crate::expander::SamplingMode;
 
+fn print_vector(label: &str, v: &[F], max: usize) {
+    println!("{}", label);
+
+    for (i, val) in v.iter().take(max).enumerate() {
+        println!("  [{}] = {}", i, val);
+    }
+
+    if v.len() > max {
+        println!("  ... ({} more elements)", v.len() - max);
+    }
+}
 
 fn read_n() -> usize {
     let mut input = String::new();
@@ -48,10 +59,30 @@ for i in 0..trials {
     let x = random_vector(n);
 
     let trace = encode_with_trace(x.clone(), &layers);
+            println!("\n=== INPUT VECTOR ===");
+            print_vector("x:", &x, 10);
 
-    let mut y = trace.layers.last().unwrap().clone();
-    corrupt(&mut y, n / 10);
+            println!("\n=== ENCODING TRACE ===");
+            for (i, layer_out) in trace.layers.iter().enumerate() {
+                print_vector(&format!("Layer {}", i), layer_out, 10);
+            }
+    //let mut y = trace.layers.last().unwrap().clone();
+    //corrupt(&mut y, n / 10);
+let correct = trace.layers.last().unwrap().clone();
 
+let mut y = correct.clone();
+corrupt(&mut y, n / 10);
+
+println!("\n=== FINAL OUTPUT (CORRECT) ===");
+print_vector("y_correct:", &correct, 5);
+
+println!("\n=== FINAL OUTPUT (CORRUPTED) ===");
+print_vector("y_corrupted:", &y, 5);
+
+
+//println!("\n=== DIFFERENCES ===");
+//for i in 0..correct.len() {if correct[i] != y[i] {println!("Mismatch at {}: correct={} corrupted={}",i, correct[i], y[i]);}}
+    
     let detected = !demo_verify_sampling(&x, &y, &layers, 5);
 
     if detected {
@@ -60,6 +91,8 @@ for i in 0..trials {
     } else {
         println!("Trial {} → FAILED", i);
     }
+
+   
 }
 
 println!("\nDetection rate: {}/{}", detected_count, trials);
