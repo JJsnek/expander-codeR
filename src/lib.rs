@@ -5,3 +5,4 @@ pub mod encoder;
 pub mod expander;
 pub mod utils;
 pub mod experiment;
+pub mod demo;

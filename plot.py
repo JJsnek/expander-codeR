@@ -139,4 +139,24 @@ plt.ylabel("Time (ms)")
 plt.legend(title="Mode")
 plt.tight_layout()
 plt.savefig("cost_vs_n.png", dpi=300)
+plt.show(block=False)
+
+
+# COST MODEL VALIDATION
+
+df_c = pd.read_csv("results_cost_model.csv")
+
+plt.figure(figsize=(7,5))
+
+sns.scatterplot(
+    data=df_c,
+    x="model_value",
+    y="measured_ms"
+)
+
+plt.title("Cost Model Validation: Theory vs Measured Runtime")
+plt.xlabel("(1/(1-α)) * (c + (α/ρ)d)")
+plt.ylabel("Measured Time (ms)")
+plt.tight_layout()
+plt.savefig("cost_model_validation.png", dpi=300)
 plt.show()
