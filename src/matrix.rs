@@ -1,39 +1,45 @@
-//sparse matrix
+//! Sparse matrix helpers.
+//!
+//! Sparse matrices are built from sampled bipartite graphs by turning edges into
+//! weighted matrix entries. The row-oriented storage is convenient for applying
+//! the matrix to a dense vector.
 
-use ark_ff::Zero;
+use crate::field::{F, rand_field, rand_nonzero};
 use crate::graph::Graph;
-use crate::field::{F,rand_field,rand_nonzero};
+use ark_ff::Zero;
 
-pub struct SparseMatrix{
-    pub rows: Vec<Vec<(usize,F)>>,
+/// Sparse matrix stored as rows of `(column, value)` entries.
+#[derive(Clone)]
+pub struct SparseMatrix {
+    pub rows: Vec<Vec<(usize, F)>>,
 }
 
-impl SparseMatrix{
-    pub fn apply(&self,x: &[F])->Vec<F>{
-        let mut result = vec![F::zero();self.rows.len()];
+impl SparseMatrix {
+    /// Multiply the sparse matrix by a dense vector.
+    pub fn apply(&self, x: &[F]) -> Vec<F> {
+        let mut result = vec![F::zero(); self.rows.len()];
 
-        for (i,row) in self.rows.iter().enumerate(){
-            let mut acc=F::zero();
+        for (i, row) in self.rows.iter().enumerate() {
+            let mut acc = F::zero();
 
-            for(col,val) in row{
+            for (col, val) in row {
                 //
                 assert!(
-                *col < x.len(),
-                "Matrix access out of bounds: col {} >= {}",
-                col,
-                x.len());
+                    *col < x.len(),
+                    "Matrix access out of bounds: col {} >= {}",
+                    col,
+                    x.len()
+                );
 
-                acc+=*val *x[*col];
+                acc += *val * x[*col];
             }
-            result[i]=acc;
+            result[i] = acc;
         }
         result
     }
 }
 
-//Brakedown-style
-
-
+/// Build a sparse matrix whose edge weights are fully random field elements.
 pub fn from_graph_random(g: &Graph) -> SparseMatrix {
     let mut rows = vec![Vec::new(); g.right_size];
 
@@ -46,7 +52,7 @@ pub fn from_graph_random(g: &Graph) -> SparseMatrix {
     SparseMatrix { rows }
 }
 
-//Spielman-style
+/// Build a sparse matrix whose edge weights are random nonzero field elements.
 pub fn from_graph_nonzero(g: &Graph) -> SparseMatrix {
     let mut rows = vec![Vec::new(); g.right_size];
 

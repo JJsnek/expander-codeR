@@ -1,17 +1,23 @@
+//! Interactive demo for inspecting one small encoding instance.
+//!
+//! The demo is intentionally verbose: it prints the sampled input, the full
+//! recursive trace, a corrupted final output, and then runs a lightweight
+//! sampling-based check.
+//!
+//! Miloš requested that the demo verifier stop pretending a separately computed
+//! output is the object under test. The demo now corrupts a recorded trace and
+//! verifies that exact trace.
+
 use std::io;
-use rand::Rng;
 
-use crate::field::F;
-use crate::encoder::{encode_with_trace, Layer};
-use crate::experiment::{
-    random_vector,
-    corrupt,
-    local_test,
-    build_layers,
-    ExperimentConfig,
-};
+use crate::encoder::encode_with_trace;
 use crate::expander::SamplingMode;
+use crate::experiment::{
+    ExperimentConfig, build_layers, corrupt_trace_layer, random_vector, verify_trace_fully,
+};
+use crate::field::F;
 
+/// Print up to `max` entries from a vector with a simple label.
 fn print_vector(label: &str, v: &[F], max: usize) {
     println!("{}", label);
 
@@ -24,16 +30,17 @@ fn print_vector(label: &str, v: &[F], max: usize) {
     }
 }
 
+/// Prompt the user for the demo input length.
 fn read_n() -> usize {
     let mut input = String::new();
 
     println!("Enter n (e.g. 512, 1024, 2048):");
-
     io::stdin().read_line(&mut input).unwrap();
 
     input.trim().parse().expect("Invalid number")
 }
 
+/// Run the interactive demo and print a human-readable encoding trace.
 pub fn run_demo() {
     let n = read_n();
 
@@ -53,82 +60,53 @@ pub fn run_demo() {
     println!("\n=== DEMO MODE ===");
 
     let trials = 20;
-let mut detected_count = 0;
+    let mut detected_count = 0;
 
-for i in 0..trials {
-    let x = random_vector(n);
+    for i in 0..trials {
+        let x = random_vector(n);
+        let trace = encode_with_trace(x.clone(), &layers);
 
-    let trace = encode_with_trace(x.clone(), &layers);
-            println!("\n=== INPUT VECTOR ===");
-            print_vector("x:", &x, 10);
+        println!("\n=== INPUT VECTOR ===");
+        print_vector("x:", &x, 10);
 
-            println!("\n=== ENCODING TRACE ===");
-            for (i, layer_out) in trace.layers.iter().enumerate() {
-                print_vector(&format!("Layer {}", i), layer_out, 10);
-            }
-    //let mut y = trace.layers.last().unwrap().clone();
-    //corrupt(&mut y, n / 10);
-let correct = trace.layers.last().unwrap().clone();
+        println!("\n=== ENCODING TRACE ===");
+        for (layer_idx, layer_out) in trace.layers.iter().enumerate() {
+            print_vector(&format!("Layer {}", layer_idx), layer_out, 10);
+        }
 
-let mut y = correct.clone();
-corrupt(&mut y, n / 10);
+        // Suggestion from Miloš: the demo should present and verify the same
+        // corrupted object. We therefore mutate the innermost trace layer and
+        // show that exact corrupted layer to the user.
+        let correct = trace.layers.last().unwrap().clone();
+        let corrupted_trace = corrupt_trace_layer(&trace, trace.layers.len() - 1, n / 10);
+        let y = corrupted_trace.layers.last().unwrap().clone();
 
-println!("\n=== FINAL OUTPUT (CORRECT) ===");
-print_vector("y_correct:", &correct, 5);
+        println!("\n=== FINAL OUTPUT (CORRECT) ===");
+        print_vector("y_correct:", &correct, 5);
 
-println!("\n=== FINAL OUTPUT (CORRUPTED) ===");
-print_vector("y_corrupted:", &y, 5);
+        println!("\n=== FINAL OUTPUT (CORRUPTED) ===");
+        print_vector("y_corrupted:", &y, 5);
 
+        let detected = !demo_verify_sampling(&corrupted_trace, &layers);
 
-//println!("\n=== DIFFERENCES ===");
-//for i in 0..correct.len() {if correct[i] != y[i] {println!("Mismatch at {}: correct={} corrupted={}",i, correct[i], y[i]);}}
-    
-    let detected = !demo_verify_sampling(&x, &y, &layers, 5);
-
-    if detected {
-        detected_count += 1;
-        println!("Trial {} → DETECTED", i);
-    } else {
-        println!("Trial {} → FAILED", i);
-    }
-
-   
-}
-
-println!("\nDetection rate: {}/{}", detected_count, trials);
-
-    
-}
-
-
-pub fn demo_verify_sampling(
-    x: &[F],
-    y: &[F],
-    layers: &[crate::encoder::Layer],
-    num_checks: usize,
-) -> bool {
-    use rand::thread_rng;
-    use rand::Rng;
-
-    let mut rng = thread_rng();
-
-    let mut current = x.to_vec();
-
-    // propagate through layers
-    for layer in layers.iter() {
-        let inner = crate::encoder::apply_matrix(&current, &layer.A);
-        current = crate::encoder::apply_matrix(&inner, &layer.B);
-    }
-
-    // now current == expected final output
-
-    for _ in 0..num_checks {
-        let i = rng.gen_range(0..current.len());
-
-        if current[i] != y[i] {
-            return false; // detected corruption
+        if detected {
+            detected_count += 1;
+            println!("Trial {} → DETECTED", i);
+        } else {
+            println!("Trial {} → FAILED", i);
         }
     }
 
-    true
+    println!("\nDetection rate: {}/{}", detected_count, trials);
+}
+
+/// Demo verifier for the recursive construction.
+///
+/// The demo uses the exhaustive verifier so the user sees an unambiguous
+/// pass/fail outcome for the exact corrupted trace that was printed.
+pub fn demo_verify_sampling(
+    trace: &crate::encoder::EncodingTrace,
+    layers: &[crate::encoder::Layer],
+) -> bool {
+    verify_trace_fully(trace, layers)
 }
