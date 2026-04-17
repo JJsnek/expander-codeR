@@ -11,6 +11,7 @@ use crate::field::{F, hash_pair};
 use crate::matrix::SparseMatrix;
 
 /// One recursive encoding layer.
+#[derive(Clone)]
 pub struct Layer {
     pub A: SparseMatrix,
     pub B: SparseMatrix,
@@ -22,6 +23,7 @@ pub fn apply_matrix(x: &[F], m: &SparseMatrix) -> Vec<F> {
 }
 
 /// Captures the codeword produced at each recursive depth.
+#[derive(Clone)]
 pub struct EncodingTrace {
     pub layers: Vec<Vec<F>>, // store each layer output
 }

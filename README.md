@@ -73,19 +73,23 @@ The batch experiment harness measures:
 - average encoding time
 - a failure count derived from the current local consistency test
 
+## Improvements Made
+
+The following verifier improvements were implemented from Miloš's suggestions:
+
+- the experiment harness now corrupts a trace layer and verifies that corrupted trace instead of generating a detached corrupted vector and then checking the pristine trace
+- the demo now prints and verifies the same corrupted innermost trace layer, so the displayed object matches the object being checked
+- the codebase now includes a deterministic full-trace verifier, which checks every parity row in every layer and serves as the reference notion of trace consistency
+- regression tests now cover both clean traces and deliberately corrupted traces
+
 ## Important Limitations
 
-This repository compiles and runs, but the verification path is still prototype-grade.
+This repository compiles and runs, but it is still prototype-grade overall.
 
-- `run_experiment` generates a corrupted final vector, but the current `local_test` call still checks the original unmodified trace rather than the corrupted output.
-- `demo_verify_sampling` is simpler than the real recursive encoder. It applies `A` and `B` layer-by-layer and should be treated as an illustrative check, not a faithful verifier for the full construction.
-- The graph sampler is lightweight and does not prove or enforce formal expansion guarantees.
+- the graph sampler is lightweight and does not prove or enforce formal expansion guarantees
+- the randomized `local_test` used in batch runs is still a spot-check verifier rather than an exhaustive one
 - Some configuration fields, such as `alpha_num` and `alpha_den`, are stored in configs mainly for bookkeeping and sweep structure rather than deep internal use.
 
 ## Output Interpretation
 
-The CSV exports are useful for rough comparisons between modes and parameter settings, especially for runtime trends. They should not be interpreted as rigorous end-to-end coding-theory measurements until the corruption-verification path is tightened.
-
-## Next Recommended Step
-
-The highest-value follow-up is to make the verifier operate on an explicitly corrupted codeword or corrupted trace so that reported detection and failure rates match the experiment labels.
+The CSV exports are useful for rough comparisons between modes and parameter settings, especially for runtime trends. They now reflect verification over explicitly corrupted traces, but they still should not be interpreted as rigorous coding-theory results without stronger graph and soundness analysis.

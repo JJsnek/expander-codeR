@@ -3,12 +3,18 @@
 //! The demo is intentionally verbose: it prints the sampled input, the full
 //! recursive trace, a corrupted final output, and then runs a lightweight
 //! sampling-based check.
+//!
+//! Miloš requested that the demo verifier stop pretending a separately computed
+//! output is the object under test. The demo now corrupts a recorded trace and
+//! verifies that exact trace.
 
 use std::io;
 
 use crate::encoder::encode_with_trace;
 use crate::expander::SamplingMode;
-use crate::experiment::{ExperimentConfig, build_layers, corrupt, random_vector};
+use crate::experiment::{
+    ExperimentConfig, build_layers, corrupt_trace_layer, random_vector, verify_trace_fully,
+};
 use crate::field::F;
 
 /// Print up to `max` entries from a vector with a simple label.
@@ -68,11 +74,12 @@ pub fn run_demo() {
             print_vector(&format!("Layer {}", layer_idx), layer_out, 10);
         }
 
-        // The final trace entry is the innermost output produced by the
-        // recursion. The demo corrupts a copy for illustration.
+        // Suggestion from Miloš: the demo should present and verify the same
+        // corrupted object. We therefore mutate the innermost trace layer and
+        // show that exact corrupted layer to the user.
         let correct = trace.layers.last().unwrap().clone();
-        let mut y = correct.clone();
-        corrupt(&mut y, n / 10);
+        let corrupted_trace = corrupt_trace_layer(&trace, trace.layers.len() - 1, n / 10);
+        let y = corrupted_trace.layers.last().unwrap().clone();
 
         println!("\n=== FINAL OUTPUT (CORRECT) ===");
         print_vector("y_correct:", &correct, 5);
@@ -80,7 +87,7 @@ pub fn run_demo() {
         println!("\n=== FINAL OUTPUT (CORRUPTED) ===");
         print_vector("y_corrupted:", &y, 5);
 
-        let detected = !demo_verify_sampling(&x, &y, &layers, 5);
+        let detected = !demo_verify_sampling(&corrupted_trace, &layers);
 
         if detected {
             detected_count += 1;
@@ -93,37 +100,13 @@ pub fn run_demo() {
     println!("\nDetection rate: {}/{}", detected_count, trials);
 }
 
-/// Demo-only verifier that samples a few output coordinates.
+/// Demo verifier for the recursive construction.
 ///
-/// This function recomputes a compact output by applying each layer's `A` then
-/// `B` maps in sequence. That is simpler than the actual recursive encoder used
-/// elsewhere in the crate, so this routine should be read as an illustrative demo
-/// check rather than a faithful verifier for the full construction.
+/// The demo uses the exhaustive verifier so the user sees an unambiguous
+/// pass/fail outcome for the exact corrupted trace that was printed.
 pub fn demo_verify_sampling(
-    x: &[F],
-    y: &[F],
+    trace: &crate::encoder::EncodingTrace,
     layers: &[crate::encoder::Layer],
-    num_checks: usize,
 ) -> bool {
-    use rand::Rng;
-    use rand::thread_rng;
-
-    let mut rng = thread_rng();
-    let mut current = x.to_vec();
-
-    // Propagate through the sparse linear maps and sample a few output indices.
-    for layer in layers {
-        let inner = crate::encoder::apply_matrix(&current, &layer.A);
-        current = crate::encoder::apply_matrix(&inner, &layer.B);
-    }
-
-    for _ in 0..num_checks {
-        let i = rng.gen_range(0..current.len());
-
-        if current[i] != y[i] {
-            return false;
-        }
-    }
-
-    true
+    verify_trace_fully(trace, layers)
 }

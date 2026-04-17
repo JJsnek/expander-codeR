@@ -9,6 +9,7 @@ use crate::graph::Graph;
 use ark_ff::Zero;
 
 /// Sparse matrix stored as rows of `(column, value)` entries.
+#[derive(Clone)]
 pub struct SparseMatrix {
     pub rows: Vec<Vec<(usize, F)>>,
 }
